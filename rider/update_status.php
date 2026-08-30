@@ -4,30 +4,31 @@
 require_once "../config/database.php";
 require_once "../config/session.php";
 
-// Check login
-if (!isset($_SESSION['user_id'])) {
+// Check that user is logged in
+if (!isset($_SESSION["user_id"])) {
     header("Location: ../auth/login.php");
     exit;
 }
 
-// Only riders can update delivery status
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'rider') {
-    die("Access denied. Rider account required.");
+// Check that logged-in user is a rider
+if (!isset($_SESSION["role"]) || $_SESSION["role"] !== "rider") {
+    header("Location: dashboard.php?error=Rider+account+required.");
+    exit;
 }
 
-$rider_id = $_SESSION['user_id'];
+$rider_id = $_SESSION["user_id"];
 
-// Only accept POST requests
+// Only accept POST
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     header("Location: dashboard.php");
     exit;
 }
 
-$delivery_id = $_POST['delivery_id'] ?? "";
-$status = $_POST['status'] ?? "";
+$delivery_id = $_POST["delivery_id"] ?? "";
+$new_status = $_POST["status"] ?? "";
 
-// Check values
-if (empty($delivery_id) || empty($status)) {
+// Check required fields
+if (empty($delivery_id) || empty($new_status)) {
     header("Location: dashboard.php?error=Please+select+a+status.");
     exit;
 }
@@ -40,40 +41,38 @@ $allowed_statuses = [
     "delivered"
 ];
 
-if (!in_array($status, $allowed_statuses, true)) {
-    header("Location: dashboard.php?error=Invalid+delivery+status.");
+if (!in_array($new_status, $allowed_statuses, true)) {
+    header("Location: dashboard.php?error=Invalid+status.");
     exit;
 }
 
 try {
 
-    // Make sure this delivery belongs to this rider
-    $check_sql = "SELECT id
-                  FROM deliveries
-                  WHERE id = ?
-                  AND rider_id = ?
-                  LIMIT 1";
+    // Check that this delivery belongs to this rider
+    $sql = "SELECT id, status
+            FROM deliveries
+            WHERE id = ?
+            AND rider_id = ?
+            LIMIT 1";
 
-    $check_stmt = $pdo->prepare($check_sql);
+    $stmt = $pdo->prepare($sql);
 
-    $check_stmt->execute([
+    $stmt->execute([
         $delivery_id,
         $rider_id
     ]);
 
-    $delivery = $check_stmt->fetch(PDO::FETCH_ASSOC);
+    $delivery = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$delivery) {
-        header("Location: dashboard.php?error=Delivery+not+found.");
+        header("Location: dashboard.php?error=Delivery+not+assigned+to+you.");
         exit;
     }
 
-
-    // Start transaction
+    // Start database transaction
     $pdo->beginTransaction();
 
-
-    // Update delivery status
+    // Update delivery
     $update_sql = "UPDATE deliveries
                    SET status = ?
                    WHERE id = ?
@@ -82,51 +81,42 @@ try {
     $update_stmt = $pdo->prepare($update_sql);
 
     $update_stmt->execute([
-        $status,
+        $new_status,
         $delivery_id,
         $rider_id
     ]);
 
-
-    // Save status history
+    // Add record to history
     $history_sql = "INSERT INTO delivery_status_history
-                    (
-                        delivery_id,
-                        status,
-                        updated_by
-                    )
+                    (delivery_id, status, updated_by)
                     VALUES (?, ?, ?)";
 
     $history_stmt = $pdo->prepare($history_sql);
 
     $history_stmt->execute([
         $delivery_id,
-        $status,
+        $new_status,
         $rider_id
     ]);
 
-
-    // Finish transaction
+    // Save everything
     $pdo->commit();
 
-
-    // Return to dashboard
     header(
         "Location: dashboard.php?success=Delivery+status+updated+successfully."
     );
 
     exit;
 
-
 } catch (PDOException $e) {
 
-    // Cancel transaction if something failed
+    // Undo changes if something went wrong
     if ($pdo->inTransaction()) {
         $pdo->rollBack();
     }
 
     header(
-        "Location: dashboard.php?error=Could+not+update+delivery+status."
+        "Location: dashboard.php?error=Database+error+while+updating+status."
     );
 
     exit;

@@ -4,20 +4,20 @@
 require_once "../config/database.php";
 require_once "../config/session.php";
 
-// Check login
+// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../auth/login.php");
     exit;
 }
 
-// Only riders can access this page
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'rider') {
-    die("Access denied. Rider account required.");
+// Only retailers can view delivery history
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'retailer') {
+    die("Access denied. Retailer account required.");
 }
 
-$rider_id = $_SESSION['user_id'];
+$retailer_id = $_SESSION['user_id'];
 
-// Get delivery ID
+// Get delivery ID from URL
 $delivery_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($delivery_id <= 0) {
@@ -32,25 +32,25 @@ if ($delivery_id <= 0) {
 $delivery_sql = "SELECT *
                  FROM deliveries
                  WHERE id = ?
-                 AND rider_id = ?
+                 AND retailer_id = ?
                  LIMIT 1";
 
 $delivery_stmt = $pdo->prepare($delivery_sql);
 
 $delivery_stmt->execute([
     $delivery_id,
-    $rider_id
+    $retailer_id
 ]);
 
 $delivery = $delivery_stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$delivery) {
-    die("Delivery not found or this delivery is not assigned to you.");
+    die("Delivery not found.");
 }
 
 
 // --------------------------------------------------
-// GET HISTORY
+// GET DELIVERY HISTORY
 // --------------------------------------------------
 
 $history_sql = "SELECT
@@ -104,7 +104,7 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         .header h1 {
-            margin: 0 0 8px 0;
+            margin: 0;
         }
 
         .container {
@@ -116,15 +116,11 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
         .back {
             display: inline-block;
             margin-bottom: 20px;
-            padding: 10px 16px;
-            background: #2563eb;
-            color: white;
             text-decoration: none;
+            color: white;
+            background: #2563eb;
+            padding: 10px 16px;
             border-radius: 5px;
-        }
-
-        .back:hover {
-            background: #1d4ed8;
         }
 
         .card {
@@ -146,14 +142,14 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
         .detail {
-            padding: 15px;
+            padding: 12px;
             background: #f9fafb;
-            border-radius: 6px;
+            border-radius: 5px;
         }
 
         .detail strong {
             display: block;
-            margin-bottom: 6px;
+            margin-bottom: 5px;
         }
 
         table {
@@ -185,7 +181,7 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
         .empty {
             padding: 15px;
             background: #f3f4f6;
-            border-radius: 6px;
+            border-radius: 5px;
         }
 
         @media (max-width: 700px) {
@@ -211,7 +207,7 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 <div class="header">
 
-    <h1>dunda-reflex Rider Dashboard</h1>
+    <h1>dunda-reflex</h1>
 
     <p>Delivery History</p>
 
@@ -226,13 +222,11 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
     </a>
 
 
-    <!-- DELIVERY DETAILS -->
+    <!-- DELIVERY INFORMATION -->
 
     <div class="card">
 
-        <h2>
-            Delivery #<?php echo htmlspecialchars($delivery['id']); ?>
-        </h2>
+        <h2>Delivery #<?php echo htmlspecialchars($delivery['id']); ?></h2>
 
 
         <div class="details">
@@ -266,7 +260,7 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
 
             <div class="detail">
 
-                <strong>Delivery Address</strong>
+                <strong>Address</strong>
 
                 <?php
                 echo htmlspecialchars(
@@ -325,7 +319,7 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
 
 
-    <!-- STATUS HISTORY -->
+    <!-- HISTORY -->
 
     <div class="card">
 
@@ -341,7 +335,7 @@ $history = $history_stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <tr>
 
-                        <th>ID</th>
+                        <th>#</th>
 
                         <th>Status</th>
 
