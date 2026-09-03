@@ -8,7 +8,8 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd
+    libzip-dev \
+    && docker-php-ext-install pdo pdo_mysql mbstring exif pcntl bcmath gd zip
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -19,8 +20,19 @@ WORKDIR /var/www/html
 # Copy your project files into the container
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Set environment variable to allow Composer to run as root
+ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Expose port 80 (Render automatically routes traffic to port 80)
+# Install PHP dependencies with increased memory limit
+# Remove --no-scripts if you're NOT using Laravel/Symfony
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-scripts
+
+# For Laravel/Symfony: Set document root to public folder
+# Comment out this line if using plain PHP or WordPress
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+
+# Enable Apache mod_rewrite (required for Laravel/Symfony routing)
+RUN a2enmod rewrite
+
+# Expose port 80
 EXPOSE 80
