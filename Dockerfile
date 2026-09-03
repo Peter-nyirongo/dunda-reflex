@@ -1,4 +1,5 @@
 # Use the official PHP image with Apache
+# NOTE: If your project requires PHP 8.3, change 8.2 to 8.3 below
 FROM php:8.2-apache
 
 # Install system dependencies and common PHP extensions
@@ -23,12 +24,12 @@ COPY . .
 # Set environment variable to allow Composer to run as root
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Install PHP dependencies with increased memory limit
-# Remove --no-scripts if you're NOT using Laravel/Symfony
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-scripts
+# Install PHP dependencies
+# --ignore-platform-reqs: Fixes "requires ext-xyz" or PHP version errors in Docker
+# --no-interaction: Prevents Composer from hanging waiting for user input
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --no-dev --optimize-autoloader --no-scripts --ignore-platform-reqs --no-interaction
 
 # For Laravel/Symfony: Set document root to public folder
-# Comment out this line if using plain PHP or WordPress
 ENV APACHE_DOCUMENT_ROOT /var/www/html/public
 
 # Enable Apache mod_rewrite (required for Laravel/Symfony routing)
